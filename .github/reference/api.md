@@ -1,6 +1,6 @@
 # API Reference — GX10 Qwen3.5 Research Hub
 
-Base URL: `http://localhost:8000`
+Base URL: `http://localhost:8050`
 
 ---
 

@@ -21,7 +21,7 @@ research_data.db — SQLite database file (git-ignored)
 ## Essential Commands
 - **Start server**: `python server.py` or `uvicorn server:app --reload`
 - **Install dependencies**: `pip install fastapi uvicorn crewai langchain_ollama langchain_community sqlalchemy aiosqlite duckduckgo-search python-dotenv`
-- **API docs**: `http://localhost:8000/docs` after server start
+- **API docs**: `http://localhost:8050/docs` after server start
 
 ## Code Conventions
 

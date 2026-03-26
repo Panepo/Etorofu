@@ -101,3 +101,110 @@ queued → searching → writing → tagging → completed
 | `tagging`   | Tags are being generated for the report              |
 | `completed` | Report and tags are ready; persisted to SQLite       |
 | `failed`    | An unrecoverable error occurred during processing    |
+
+---
+
+## GET `/reports`
+
+List summaries of all persisted reports (no full content).
+
+### Response `200 OK`
+
+```json
+[
+  {
+    "id": "a3f1c2b4-...",
+    "topic": "Quantum computing breakthroughs in 2025",
+    "tags": "quantum, computing, physics",
+    "created_at": 1742950000.0
+  }
+]
+```
+
+| Field        | Type         | Description                        |
+|--------------|--------------|------------------------------------|
+| `id`         | string       | Report UUID                        |
+| `topic`      | string       | Original research topic            |
+| `tags`       | string\|null | Comma-separated tags               |
+| `created_at` | float        | Unix timestamp of creation         |
+
+---
+
+## GET `/reports/{report_id}`
+
+Retrieve a single report with full content.
+
+### Path Parameters
+
+| Parameter   | Type   | Description         |
+|-------------|--------|---------------------|
+| `report_id` | string | UUID of the report  |
+
+### Response `200 OK`
+
+```json
+{
+  "id": "a3f1c2b4-...",
+  "topic": "Quantum computing breakthroughs in 2025",
+  "content": "## Research Report\n...",
+  "tags": "quantum, computing, physics",
+  "created_at": 1742950000.0
+}
+```
+
+| Field        | Type         | Description                        |
+|--------------|--------------|------------------------------------|
+| `id`         | string       | Report UUID                        |
+| `topic`      | string       | Original research topic            |
+| `content`    | string       | Full markdown report body          |
+| `tags`       | string\|null | Comma-separated tags               |
+| `created_at` | float        | Unix timestamp of creation         |
+
+### Errors
+
+| Status | Detail        | Cause                          |
+|--------|---------------|--------------------------------|
+| `404`  | 找不到該報告   | `report_id` does not exist     |
+
+---
+
+## PATCH `/reports/{report_id}`
+
+Update the content, tags, or both for an existing report. At least one field must be provided.
+
+### Path Parameters
+
+| Parameter   | Type   | Description         |
+|-------------|--------|---------------------|
+| `report_id` | string | UUID of the report  |
+
+### Request Body
+
+| Field     | Type         | Required | Description                   |
+|-----------|--------------|----------|-------------------------------|
+| `content` | string\|null | No*      | New markdown body for report  |
+| `tags`    | string\|null | No*      | New comma-separated tag string |
+
+\* At least one of `content` or `tags` must be provided.
+
+```json
+{
+  "content": "## Updated Report\n...",
+  "tags": "quantum, physics, new-tag"
+}
+```
+
+### Response `200 OK`
+
+```json
+{
+  "message": "報告已更新"
+}
+```
+
+### Errors
+
+| Status | Detail        | Cause                                      |
+|--------|---------------|--------------------------------------------|
+| `400`  | 請提供 content 或 tags | Neither field was provided          |
+| `404`  | 找不到該報告   | `report_id` does not exist                 |

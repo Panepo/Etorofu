@@ -7,7 +7,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from agent import run_knowledge_extraction
-from database import init_db, save_report
+from database import init_db, save_report, load_report, load_all_reports, update_report, update_tags
 
 load_dotenv()
 
@@ -87,6 +87,49 @@ async def get_status(task_id: str):
         "tags": task.get("tags"),
         "error": task.get("error")
     }
+
+class UpdateReportRequest(BaseModel):
+    content: str | None = None
+    tags: str | None = None
+
+
+@app.get("/reports")
+async def list_reports():
+    """列出所有報告的摘要"""
+    return await load_all_reports()
+
+
+@app.get("/reports/{report_id}")
+async def get_report(report_id: str):
+    """根據 ID 讀取單一報告"""
+    report = await load_report(report_id)
+    if not report:
+        raise HTTPException(status_code=404, detail="找不到該報告")
+    return {
+        "id": report.id,
+        "topic": report.topic,
+        "content": report.content,
+        "tags": report.tags,
+        "created_at": report.created_at,
+    }
+
+
+@app.patch("/reports/{report_id}")
+async def patch_report(report_id: str, request: UpdateReportRequest):
+    """更新報告內文或標籤（至少需提供一個欄位）"""
+    if request.content is None and request.tags is None:
+        raise HTTPException(status_code=400, detail="請提供 content 或 tags")
+
+    updated = False
+    if request.content is not None:
+        updated = await update_report(report_id, request.content) or updated
+    if request.tags is not None:
+        updated = await update_tags(report_id, request.tags) or updated
+
+    if not updated:
+        raise HTTPException(status_code=404, detail="找不到該報告")
+    return {"message": "報告已更新"}
+
 
 if __name__ == "__main__":
     import uvicorn

@@ -35,7 +35,7 @@ def install_dep():
       sys.exit(1)
 
   try:
-    pip_install("streamlit", "crewai", "langchain_community", "langchain_ollama", "duckduckgo-search", "python-dotenv", "fastapi", "sqlalchemy", "aiosqlite")
+    pip_install("streamlit", "crewai", "langchain_community", "langchain_ollama", "python-dotenv", "fastapi", "sqlalchemy", "aiosqlite", "ddgs")
   except Exception as e:
     print(f"\nInstallation failed: {e}")
     print("\nTroubleshooting:")

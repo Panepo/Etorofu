@@ -3,7 +3,7 @@ uvicorn[standard]
 crewai
 langchain_community
 langchain_ollama
-duckduckgo-search
+ddgs
 python-dotenv
 sqlalchemy
 aiosqlite

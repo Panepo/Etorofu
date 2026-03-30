@@ -3,7 +3,7 @@ import uuid
 import time
 from contextlib import asynccontextmanager
 from typing import Dict
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from agent import run_knowledge_extraction
@@ -44,26 +44,37 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(worker())
     yield
 
-app = FastAPI(title="GX10 Qwen3.5 Research Hub", lifespan=lifespan)
+app = FastAPI(title="Etorofu Research Hub", lifespan=lifespan)
 
 # --- API 端點 ---
 
 @app.post("/research")
-async def start_research(request: ResearchRequest):
-    """提交研究請求，回傳 task_id"""
-    if not request.topic:
+async def start_research(request: Request):
+    """提交研究請求，回傳 task_id（支援 JSON 與 form-urlencoded）"""
+    content_type = request.headers.get("content-type", "")
+    if "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
+        form = await request.form()
+        topic = form.get("topic", "")
+    else:
+        try:
+            body = await request.json()
+            topic = body.get("topic", "")
+        except Exception:
+            raise HTTPException(status_code=400, detail="無效的請求格式，請使用 JSON 或 form-urlencoded")
+
+    if not topic:
         raise HTTPException(status_code=400, detail="請提供研究主題")
 
     task_id = str(uuid.uuid4())
     tasks_db[task_id] = {
         "id": task_id,
-        "topic": request.topic,
+        "topic": topic,
         "status": "queued",
         "created_at": time.time(),
         "result": None
     }
 
-    await task_queue.put((task_id, request.topic))
+    await task_queue.put((task_id, topic))
     return {"task_id": task_id, "message": "任務已加入排隊隊列"}
 
 @app.get("/status/{task_id}")

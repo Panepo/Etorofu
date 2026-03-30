@@ -375,3 +375,4 @@ images
 videos
 output
 *.onnx
+*.db

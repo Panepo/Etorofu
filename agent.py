@@ -1,6 +1,7 @@
 import os
 import time
-from crewai import Agent, Task, Crew, Process
+from crewai import Agent, Task, Crew, Process, LLM
+from crewai.tools import tool
 from langchain_community.tools import DuckDuckGoSearchRun
 from langchain_core.messages import HumanMessage
 from langchain_ollama import ChatOllama
@@ -12,8 +13,14 @@ load_dotenv()
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:8088")
 
 # --- 模型混合配置 ---
-MODEL_FAST = os.getenv("MODEL_FAST")    # 快速，適合反覆搜尋
-MODEL_SMART = os.getenv("MODEL_SMART")   # 強大，適合內容創作與校對
+MODEL_FAST = os.getenv("OLLAMA_MODEL_FAST")    # 快速，適合反覆搜尋
+MODEL_SMART = os.getenv("OLLAMA_MODEL_SMART")   # 強大，適合內容創作與校對
+
+
+@tool("DuckDuckGo Search")
+def duckduckgo_search(query: str) -> str:
+    """Searches the web using DuckDuckGo and returns the top results."""
+    return DuckDuckGoSearchRun().run(query)
 
 
 def generate_tags(content: str, llm) -> str:
@@ -31,10 +38,12 @@ def generate_tags(content: str, llm) -> str:
 
 def run_knowledge_extraction(task_id: str, topic: str, tasks_db: dict):
     try:
-        # 初始化模型
-        fast_llm = ChatOllama(baseUrl=OLLAMA_URL, model=MODEL_FAST, temperature=0.5)
-        smart_llm = ChatOllama(baseUrl=OLLAMA_URL, model=MODEL_SMART, temperature=0.7)
-        search_tool = DuckDuckGoSearchRun()
+        # ChatOllama instances for direct LangChain calls (e.g. generate_tags)
+        fast_chat = ChatOllama(base_url=OLLAMA_URL, model=MODEL_FAST, temperature=0.5)
+
+        # CrewAI LLM instances for agents
+        fast_llm = LLM(model=f"ollama/{MODEL_FAST}", base_url=OLLAMA_URL, temperature=0.5)
+        smart_llm = LLM(model=f"ollama/{MODEL_SMART}", base_url=OLLAMA_URL, temperature=0.7)
 
         # 1. 研究員 (使用快速模型)
         tasks_db[task_id]["status"] = "searching"
@@ -42,7 +51,7 @@ def run_knowledge_extraction(task_id: str, topic: str, tasks_db: dict):
             role='資深情報分析員',
             goal=f'搜集關於 {topic} 的最新事實、數據與趨勢',
             backstory="你擅長在大量網路資訊中過濾出最有價值的核心情報。",
-            tools=[search_tool],
+            tools=[duckduckgo_search],
             llm=fast_llm,
             verbose=True
         )
@@ -82,7 +91,7 @@ def run_knowledge_extraction(task_id: str, topic: str, tasks_db: dict):
 
         # 生成標籤
         tasks_db[task_id]["status"] = "tagging"
-        tags = generate_tags(result_str, fast_llm)
+        tags = generate_tags(result_str, fast_chat)
 
         tasks_db[task_id]["status"] = "completed"
         tasks_db[task_id]["result"] = result_str

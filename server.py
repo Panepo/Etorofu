@@ -1,4 +1,6 @@
 import asyncio
+import datetime
+import os
 import uuid
 import time
 from contextlib import asynccontextmanager
@@ -38,10 +40,43 @@ async def worker():
             )
         task_queue.task_done()
 
+# --- Cron Worker ---
+async def cron_daemon() -> None:
+    """Submit a daily report via the shared task queue based on .env settings."""
+    topic: str = os.getenv("CRON_TOPIC", "").strip()
+    if not topic:
+        return
+
+    schedule_time: str = os.getenv("CRON_SCHEDULE", "08:00").strip()
+    print(f"[cron] Daemon active — topic={topic!r}  schedule={schedule_time}")
+
+    while True:
+        now = datetime.datetime.now()
+        target_h, target_m = map(int, schedule_time.split(":"))
+        next_run = now.replace(hour=target_h, minute=target_m, second=0, microsecond=0)
+        if next_run <= now:
+            next_run += datetime.timedelta(days=1)
+
+        print(f"[cron] Next run at {next_run.strftime('%Y-%m-%d %H:%M')}")
+        await asyncio.sleep((next_run - now).total_seconds())
+
+        task_id = str(uuid.uuid4())
+        tasks_db[task_id] = {
+            "id": task_id,
+            "topic": topic,
+            "status": "queued",
+            "created_at": time.time(),
+            "result": None,
+        }
+        await task_queue.put((task_id, topic))
+        print(f"[cron] Queued daily report — task_id={task_id}  topic={topic!r}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
     asyncio.create_task(worker())
+    asyncio.create_task(cron_daemon())
     yield
 
 app = FastAPI(title="Etorofu Research Hub", lifespan=lifespan)

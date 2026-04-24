@@ -30,6 +30,7 @@ COPY --from=builder /install /usr/local
 
 # Copy application source
 COPY server.py agent.py database.py ./
+COPY static/ ./static/
 
 # Persistent volume for the SQLite database
 VOLUME ["/data"]

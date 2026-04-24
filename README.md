@@ -38,6 +38,7 @@ cron.py             — Standalone script for scheduled report generation
 install_dependency.py — Dependency installer helper
 requirements.txt    — Python dependencies
 Dockerfile          — Multi-stage Docker build
+static/index.html   — Single-page web UI (list, add, edit, delete reports)
 research_data.db    — SQLite database (created on first run, git-ignored)
 ```
 
@@ -75,6 +76,7 @@ CRON_SCHEDULE=08:00
 uvicorn server:app --host 0.0.0.0 --port 8050
 ```
 
+The web UI is available at `http://localhost:8050/`.
 Interactive API docs are available at `http://localhost:8050/docs`.
 
 ## API Reference
@@ -122,6 +124,12 @@ Content-Type: application/json
 ```
 
 At least one field (`content` or `tags`) must be provided.
+
+### Delete a report
+
+```
+DELETE /reports/{report_id}
+```
 
 ## Scheduled Reports (Cron)
 

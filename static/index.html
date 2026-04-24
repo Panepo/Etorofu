@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Etorofu Research Hub</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #1a1d27;
+      border-bottom: 1px solid #2d3148;
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    header h1 { font-size: 1.25rem; font-weight: 600; letter-spacing: .02em; }
+    header span { font-size: .8rem; color: #64748b; }
+
+    main { max-width: 960px; margin: 2rem auto; padding: 0 1.5rem; }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .toolbar h2 { flex: 1; font-size: 1rem; color: #94a3b8; font-weight: 500; }
+
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+      font-size: .875rem;
+      font-weight: 500;
+      padding: .45rem .9rem;
+      transition: opacity .15s;
+    }
+    button:hover { opacity: .85; }
+    button:disabled { opacity: .4; cursor: not-allowed; }
+
+    .btn-primary   { background: #6366f1; color: #fff; }
+    .btn-secondary { background: #334155; color: #e2e8f0; }
+    .btn-danger    { background: #dc2626; color: #fff; }
+    .btn-icon      { background: transparent; padding: .3rem .5rem; font-size: 1rem; }
+
+    /* Table */
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      text-align: left;
+      font-size: .75rem;
+      font-weight: 600;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      padding: .6rem 1rem;
+      border-bottom: 1px solid #1e2337;
+    }
+    thead th.sortable {
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+    thead th.sortable:hover { color: #94a3b8; }
+    thead th.sort-asc,
+    thead th.sort-desc { color: #a5b4fc; }
+    .sort-arrow { margin-left: .3rem; font-style: normal; font-size: .7rem; }
+    tbody tr {
+      border-bottom: 1px solid #1a1d27;
+      transition: background .12s;
+    }
+    tbody tr:hover { background: #1a1d27; }
+    td {
+      padding: .75rem 1rem;
+      font-size: .875rem;
+      vertical-align: middle;
+    }
+    td.topic { font-weight: 500; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    td.tags  { color: #94a3b8; font-size: .8rem; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    td.date  { color: #64748b; font-size: .8rem; white-space: nowrap; }
+    td.actions { white-space: nowrap; }
+
+    /* Empty state */
+    .empty {
+      text-align: center;
+      padding: 4rem 0;
+      color: #475569;
+    }
+    .empty p { margin-top: .5rem; font-size: .875rem; }
+
+    /* Modal overlay */
+    .overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.65);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .overlay.open { display: flex; }
+
+    .modal {
+      background: #1a1d27;
+      border: 1px solid #2d3148;
+      border-radius: 10px;
+      width: min(680px, 95vw);
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      padding: 1.1rem 1.4rem;
+      border-bottom: 1px solid #2d3148;
+    }
+    .modal-header h3 { flex: 1; font-size: 1rem; }
+    .modal-close {
+      background: none;
+      border: none;
+      color: #64748b;
+      font-size: 1.25rem;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0 .25rem;
+    }
+    .modal-close:hover { color: #e2e8f0; }
+
+    .modal-body { padding: 1.2rem 1.4rem; overflow-y: auto; flex: 1; }
+
+    label { display: block; font-size: .8rem; color: #94a3b8; margin-bottom: .35rem; margin-top: .9rem; font-weight: 500; }
+    label:first-child { margin-top: 0; }
+
+    input[type="text"], textarea {
+      width: 100%;
+      background: #0f1117;
+      border: 1px solid #2d3148;
+      border-radius: 6px;
+      color: #e2e8f0;
+      font-size: .875rem;
+      padding: .55rem .8rem;
+      outline: none;
+      transition: border-color .15s;
+      resize: vertical;
+    }
+    input[type="text"]:focus, textarea:focus { border-color: #6366f1; }
+    textarea { min-height: 260px; font-family: inherit; line-height: 1.6; }
+
+    .modal-footer {
+      display: flex;
+      gap: .6rem;
+      justify-content: flex-end;
+      padding: .9rem 1.4rem;
+      border-top: 1px solid #2d3148;
+    }
+
+    /* Status badge */
+    .status-badge {
+      display: inline-block;
+      font-size: .7rem;
+      font-weight: 600;
+      padding: .18rem .55rem;
+      border-radius: 999px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .status-queued    { background: #1e3a5f; color: #60a5fa; }
+    .status-searching { background: #1a3040; color: #38bdf8; }
+    .status-writing   { background: #2d1b4e; color: #c084fc; }
+    .status-tagging   { background: #1a2e1a; color: #4ade80; }
+    .status-completed { background: #14532d; color: #4ade80; }
+    .status-failed    { background: #450a0a; color: #f87171; }
+
+    /* Progress message */
+    #progress-msg { font-size: .8rem; color: #94a3b8; margin-top: .6rem; min-height: 1.2em; }
+
+    /* Delete confirm modal */
+    #confirm-modal .modal { width: min(380px, 95vw); }
+    #confirm-modal p { font-size: .875rem; color: #94a3b8; margin-top: .5rem; }
+    #confirm-modal strong { color: #e2e8f0; }
+
+    /* Content view — markdown-like */
+    .content-view {
+      font-size: .875rem;
+      line-height: 1.8;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #cbd5e1;
+    }
+
+    /* Tags pill */
+    .tag-pill {
+      display: inline-block;
+      background: #1e2337;
+      color: #94a3b8;
+      border-radius: 999px;
+      padding: .1rem .5rem;
+      font-size: .72rem;
+      margin: .1rem .1rem 0 0;
+    }
+
+    /* Spinner */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid #334155;
+      border-top-color: #6366f1;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      display: inline-block;
+      vertical-align: middle;
+      margin-right: .4rem;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Etorofu Research Hub</h1>
+  <span id="report-count"></span>
+</header>
+
+<main>
+  <div class="toolbar">
+    <h2>Research Reports</h2>
+    <button class="btn-primary" onclick="openAddModal()">+ New Research</button>
+  </div>
+
+  <div id="list-container">
+    <table>
+      <thead>
+        <tr>
+          <th class="sortable" data-col="topic" onclick="sortBy('topic')">Topic <i class="sort-arrow" id="arr-topic"></i></th>
+          <th class="sortable" data-col="tags" onclick="sortBy('tags')">Tags <i class="sort-arrow" id="arr-tags"></i></th>
+          <th class="sortable" data-col="created_at" onclick="sortBy('created_at')">Created <i class="sort-arrow" id="arr-created_at">▼</i></th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="report-tbody"></tbody>
+    </table>
+    <div id="empty-state" class="empty" style="display:none">
+      <div style="font-size:2rem">📋</div>
+      <p>No research reports yet.</p>
+    </div>
+  </div>
+</main>
+
+<!-- ── Add Modal ── -->
+<div class="overlay" id="add-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>New Research</h3>
+      <button class="modal-close" onclick="closeModal('add-overlay')">✕</button>
+    </div>
+    <div class="modal-body">
+      <label>Research Topic</label>
+      <input type="text" id="new-topic" placeholder="e.g. Quantum computing breakthroughs 2025" />
+      <div id="progress-msg"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('add-overlay')">Cancel</button>
+      <button class="btn-primary" id="submit-btn" onclick="submitResearch()">Start Research</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── View/Edit Modal ── -->
+<div class="overlay" id="edit-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="edit-title">Report</h3>
+      <button class="modal-close" onclick="closeModal('edit-overlay')">✕</button>
+    </div>
+    <div class="modal-body">
+      <label>Topic</label>
+      <input type="text" id="edit-topic" readonly style="color:#64748b;cursor:default" />
+      <label>Tags <span style="font-weight:400;color:#475569">(comma-separated)</span></label>
+      <input type="text" id="edit-tags" placeholder="e.g. AI, science, 2025" />
+      <label>Content</label>
+      <textarea id="edit-content"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('edit-overlay')">Cancel</button>
+      <button class="btn-primary" onclick="saveEdit()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── View-only Modal ── -->
+<div class="overlay" id="view-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="view-title">Report</h3>
+      <button class="modal-close" onclick="closeModal('view-overlay')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="view-tags" style="margin-bottom:.8rem"></div>
+      <div id="view-content" class="content-view"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('view-overlay')">Close</button>
+      <button class="btn-primary" onclick="switchToEdit()">Edit</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Confirm Delete Modal ── -->
+<div class="overlay" id="confirm-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Delete Report</h3>
+      <button class="modal-close" onclick="closeModal('confirm-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p>Are you sure you want to delete <strong id="confirm-topic"></strong>?<br>This action cannot be undone.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('confirm-modal')">Cancel</button>
+      <button class="btn-danger" onclick="confirmDelete()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let reports = [];
+  let currentId = null;  // used by edit & delete
+  let sortCol = 'created_at';
+  let sortDir = 'desc'; // 'asc' | 'desc'
+
+  // ── Utility ────────────────────────────────────────────────
+  const $ = id => document.getElementById(id);
+
+  function fmt(ts) {
+    return new Date(ts * 1000).toLocaleString(undefined, {
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+  }
+
+  function tagPills(tags) {
+    if (!tags) return '<span style="color:#475569">—</span>';
+    return tags.split(',').map(t => t.trim()).filter(Boolean)
+      .map(t => `<span class="tag-pill">${escHtml(t)}</span>`).join('');
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function openModal(id) { $(id).classList.add('open'); }
+  function closeModal(id) {
+    $(id).classList.remove('open');
+    if (id === 'add-overlay') {
+      $('new-topic').value = '';
+      $('progress-msg').innerHTML = '';
+      $('submit-btn').disabled = false;
+      $('submit-btn').innerHTML = 'Start Research';
+    }
+  }
+
+  // close on backdrop click
+  document.querySelectorAll('.overlay').forEach(el => {
+    el.addEventListener('click', e => { if (e.target === el) closeModal(el.id); });
+  });
+
+  // ── Sorting ────────────────────────────────────────────────
+  function sortBy(col) {
+    if (sortCol === col) {
+      sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      sortCol = col;
+      sortDir = col === 'created_at' ? 'desc' : 'asc';
+    }
+    applySort();
+    updateSortArrows();
+    renderTable();
+  }
+
+  function applySort() {
+    reports.sort((a, b) => {
+      let va = a[sortCol] ?? '';
+      let vb = b[sortCol] ?? '';
+      if (sortCol === 'created_at') {
+        va = Number(va); vb = Number(vb);
+      } else {
+        va = String(va).toLowerCase(); vb = String(vb).toLowerCase();
+      }
+      if (va < vb) return sortDir === 'asc' ? -1 : 1;
+      if (va > vb) return sortDir === 'asc' ?  1 : -1;
+      return 0;
+    });
+  }
+
+  function updateSortArrows() {
+    ['topic', 'tags', 'created_at'].forEach(col => {
+      const th = document.querySelector(`th[data-col="${col}"]`);
+      const arrow = $(`arr-${col}`);
+      th.classList.remove('sort-asc', 'sort-desc');
+      if (col === sortCol) {
+        th.classList.add(sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+        arrow.textContent = sortDir === 'asc' ? '▲' : '▼';
+      } else {
+        arrow.textContent = '';
+      }
+    });
+  }
+
+  // ── Load Reports ───────────────────────────────────────────
+  async function loadReports() {
+    const res = await fetch('/reports');
+    reports = await res.json();
+    applySort();
+    renderTable();
+  }
+
+  function renderTable() {
+    const tbody = $('report-tbody');
+    const empty = $('empty-state');
+    $('report-count').textContent = `${reports.length} report${reports.length !== 1 ? 's' : ''}`;
+
+    if (reports.length === 0) {
+      tbody.innerHTML = '';
+      empty.style.display = '';
+      return;
+    }
+    empty.style.display = 'none';
+
+    tbody.innerHTML = reports.map(r => `
+      <tr>
+        <td class="topic">
+          <a href="#" style="color:#a5b4fc;text-decoration:none" onclick="viewReport('${r.id}');return false">
+            ${escHtml(r.topic)}
+          </a>
+        </td>
+        <td class="tags">${tagPills(r.tags)}</td>
+        <td class="date">${fmt(r.created_at)}</td>
+        <td class="actions">
+          <button class="btn-icon" title="Edit" onclick="openEditModal('${r.id}')">✏️</button>
+          <button class="btn-icon" title="Delete" onclick="openDeleteModal('${r.id}')">🗑️</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  // ── View Report ────────────────────────────────────────────
+  async function viewReport(id) {
+    currentId = id;
+    const res = await fetch(`/reports/${id}`);
+    const r = await res.json();
+    $('view-title').textContent = r.topic;
+    $('view-tags').innerHTML = tagPills(r.tags);
+    $('view-content').textContent = r.content;
+    openModal('view-overlay');
+  }
+
+  function switchToEdit() {
+    closeModal('view-overlay');
+    openEditModal(currentId);
+  }
+
+  // ── Add Research ───────────────────────────────────────────
+  function openAddModal() {
+    openModal('add-overlay');
+    setTimeout(() => $('new-topic').focus(), 50);
+  }
+
+  $('new-topic').addEventListener('keydown', e => {
+    if (e.key === 'Enter') submitResearch();
+  });
+
+  async function submitResearch() {
+    const topic = $('new-topic').value.trim();
+    if (!topic) { $('new-topic').focus(); return; }
+
+    $('submit-btn').disabled = true;
+    $('submit-btn').innerHTML = '<span class="spinner"></span>Queuing…';
+
+    const res = await fetch('/research', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      $('progress-msg').innerHTML = `<span style="color:#f87171">${escHtml(data.detail || 'Error')}</span>`;
+      $('submit-btn').disabled = false;
+      $('submit-btn').innerHTML = 'Start Research';
+      return;
+    }
+
+    pollStatus(data.task_id);
+  }
+
+  async function pollStatus(taskId) {
+    const msg = $('progress-msg');
+    const statusLabels = {
+      queued: 'Queued — waiting to start…',
+      searching: 'Searching the web…',
+      writing: 'Writing the report…',
+      tagging: 'Generating tags…',
+      completed: 'Completed!',
+      failed: 'Failed',
+    };
+    const statusClass = {
+      queued: 'status-queued', searching: 'status-searching',
+      writing: 'status-writing', tagging: 'status-tagging',
+      completed: 'status-completed', failed: 'status-failed',
+    };
+
+    async function tick() {
+      const res = await fetch(`/status/${taskId}`);
+      const data = await res.json();
+      const label = statusLabels[data.status] || data.status;
+      const cls = statusClass[data.status] || '';
+      const elapsed = data.elapsed_seconds > 0 ? ` · ${data.elapsed_seconds}s` : '';
+      msg.innerHTML = `<span class="status-badge ${cls}">${label}</span><span style="color:#475569">${elapsed}</span>`;
+
+      if (data.status === 'completed') {
+        $('submit-btn').innerHTML = '✓ Done';
+        await loadReports();
+        setTimeout(() => closeModal('add-overlay'), 1200);
+        return;
+      }
+      if (data.status === 'failed') {
+        msg.innerHTML += `<br><span style="color:#f87171">${escHtml(data.error || 'Unknown error')}</span>`;
+        $('submit-btn').disabled = false;
+        $('submit-btn').innerHTML = 'Retry';
+        return;
+      }
+      setTimeout(tick, 2000);
+    }
+    tick();
+  }
+
+  // ── Edit Report ────────────────────────────────────────────
+  async function openEditModal(id) {
+    currentId = id;
+    const res = await fetch(`/reports/${id}`);
+    const r = await res.json();
+    $('edit-title').textContent = r.topic;
+    $('edit-topic').value = r.topic;
+    $('edit-tags').value = r.tags || '';
+    $('edit-content').value = r.content;
+    openModal('edit-overlay');
+    setTimeout(() => $('edit-tags').focus(), 50);
+  }
+
+  async function saveEdit() {
+    const tags = $('edit-tags').value.trim();
+    const content = $('edit-content').value;
+
+    const res = await fetch(`/reports/${currentId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content, tags })
+    });
+    if (!res.ok) {
+      const d = await res.json();
+      alert(d.detail || 'Save failed');
+      return;
+    }
+    closeModal('edit-overlay');
+    await loadReports();
+  }
+
+  // ── Delete Report ──────────────────────────────────────────
+  function openDeleteModal(id) {
+    currentId = id;
+    const report = reports.find(r => r.id === id);
+    $('confirm-topic').textContent = report ? `"${report.topic}"` : 'this report';
+    openModal('confirm-modal');
+  }
+
+  async function confirmDelete() {
+    const res = await fetch(`/reports/${currentId}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const d = await res.json();
+      alert(d.detail || 'Delete failed');
+      return;
+    }
+    closeModal('confirm-modal');
+    await loadReports();
+  }
+
+  // ── Init ───────────────────────────────────────────────────
+  loadReports();
+</script>
+</body>
+</html>

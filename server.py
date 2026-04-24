@@ -6,10 +6,12 @@ import time
 from contextlib import asynccontextmanager
 from typing import Dict
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from agent import run_knowledge_extraction
-from database import init_db, save_report, load_report, load_all_reports, update_report, update_tags
+from database import init_db, save_report, load_report, load_all_reports, update_report, update_tags, delete_report
 
 load_dotenv()
 
@@ -175,6 +177,18 @@ async def patch_report(report_id: str, request: UpdateReportRequest):
     if not updated:
         raise HTTPException(status_code=404, detail="找不到該報告")
     return {"message": "報告已更新"}
+
+
+@app.delete("/reports/{report_id}")
+async def remove_report(report_id: str):
+    """刪除報告"""
+    deleted = await delete_report(report_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="找不到該報告")
+    return {"message": "報告已刪除"}
+
+
+app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 
 if __name__ == "__main__":

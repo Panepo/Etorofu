@@ -335,6 +335,10 @@
 </div>
 
 <script>
+  // Resolve API prefix — works both locally (no prefix) and behind nginx at /etorofu/
+  const API_PREFIX = window.location.pathname.startsWith('/etorofu') ? '/etorofu' : '';
+  const api = path => `${API_PREFIX}/${path}`;
+
   let reports = [];
   let currentId = null;  // used by edit & delete
   let sortCol = 'created_at';
@@ -420,7 +424,7 @@
 
   // ── Load Reports ───────────────────────────────────────────
   async function loadReports() {
-    const res = await fetch('/reports');
+    const res = await fetch(api('reports'));
     reports = await res.json();
     applySort();
     renderTable();
@@ -458,7 +462,7 @@
   // ── View Report ────────────────────────────────────────────
   async function viewReport(id) {
     currentId = id;
-    const res = await fetch(`/reports/${id}`);
+    const res = await fetch(api(`reports/${id}`));
     const r = await res.json();
     $('view-title').textContent = r.topic;
     $('view-tags').innerHTML = tagPills(r.tags);
@@ -488,7 +492,7 @@
     $('submit-btn').disabled = true;
     $('submit-btn').innerHTML = '<span class="spinner"></span>Queuing…';
 
-    const res = await fetch('/research', {
+    const res = await fetch(api('research'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ topic })
@@ -521,7 +525,7 @@
     };
 
     async function tick() {
-      const res = await fetch(`/status/${taskId}`);
+      const res = await fetch(api(`status/${taskId}`));
       const data = await res.json();
       const label = statusLabels[data.status] || data.status;
       const cls = statusClass[data.status] || '';
@@ -548,7 +552,7 @@
   // ── Edit Report ────────────────────────────────────────────
   async function openEditModal(id) {
     currentId = id;
-    const res = await fetch(`/reports/${id}`);
+    const res = await fetch(api(`reports/${id}`));
     const r = await res.json();
     $('edit-title').textContent = r.topic;
     $('edit-topic').value = r.topic;
@@ -562,7 +566,7 @@
     const tags = $('edit-tags').value.trim();
     const content = $('edit-content').value;
 
-    const res = await fetch(`/reports/${currentId}`, {
+    const res = await fetch(api(`reports/${currentId}`), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content, tags })
@@ -585,7 +589,7 @@
   }
 
   async function confirmDelete() {
-    const res = await fetch(`/reports/${currentId}`, { method: 'DELETE' });
+    const res = await fetch(api(`reports/${currentId}`), { method: 'DELETE' });
     if (!res.ok) {
       const d = await res.json();
       alert(d.detail || 'Delete failed');

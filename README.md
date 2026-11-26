@@ -178,6 +178,29 @@ docker run -d \
 
 Set `CHAT_MODEL`, `CHAT_BASE_URL`, and `CHAT_API_KEY` in `.env`; they are passed to the container by `--env-file .env`.
 
+### Deployed site
+
+The site Compose and Nginx configuration in `D:\server\gx10-petallia` serves
+Etorofu at `https://swai.getac.com.tw/etorofu/`. It builds from this checkout,
+uses the site's `CHAT_MODEL`, `CHAT_BASE_URL`, `CHAT_API_KEY`, and
+`SHIRATSUYU_BASE_URL` settings, and stores SQLite data in the `etorofu_data`
+Docker volume. These URLs must be reachable from the container; `localhost`
+refers to the container itself. Scheduled topics run in Taiwan time (UTC+8).
+
+From the site configuration directory, deploy the changes with:
+
+```bash
+docker compose up -d --build etorofu
+docker compose exec nginx nginx -t
+docker compose up -d --no-deps nginx
+```
+
+The dedicated `etorofu_proxy` network gives Nginx the trusted address
+`172.30.245.2` and Etorofu `172.30.245.3`, so Uvicorn accepts forwarded HTTPS
+headers only from Nginx. If its subnet conflicts with an existing network,
+update both addresses, Uvicorn's `--forwarded-allow-ips`, and Nginx's upstream
+address together.
+
 ## Architecture Notes
 
 **Single-worker queue** — only one CrewAI `Crew` runs at a time. This is intentional: the target hardware (Asus GX10) has limited VRAM, and concurrent runs would cause out-of-memory errors.

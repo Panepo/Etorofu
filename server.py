@@ -36,10 +36,10 @@ task_queue = asyncio.Queue()
 logger = logging.getLogger(__name__)
 
 
-async def enqueue_research(topic: str) -> str:
+async def enqueue_research(topic: str, details: str = "") -> str:
     task_id = str(uuid.uuid4())
     tasks_db[task_id] = {
-        "id": task_id, "topic": topic, "status": "queued",
+        "id": task_id, "topic": topic, "details": details, "status": "queued",
         "created_at": time.time(), "result": None,
     }
     await task_queue.put((task_id, topic))
@@ -51,7 +51,8 @@ async def worker():
         task_id, topic = await task_queue.get()
         # 使用 run_in_executor 避免阻塞 FastAPI 的事件循環
         loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, run_knowledge_extraction, task_id, topic, tasks_db)
+        details = tasks_db[task_id]["details"]
+        await loop.run_in_executor(None, run_knowledge_extraction, task_id, topic, tasks_db, details)
         # Persist completed report and tags to SQLite
         task_data = tasks_db.get(task_id, {})
         if task_data.get("status") == "completed":
@@ -69,7 +70,7 @@ async def cron_daemon() -> None:
     while True:
         try:
             for job in await claim_due_scheduled_topics(datetime.datetime.now()):
-                task_id = await enqueue_research(job["topic"])
+                task_id = await enqueue_research(job["topic"], job["details"])
                 logger.info("Queued scheduled report %s for schedule %s", task_id, job["id"])
         except SQLAlchemyError:
             logger.exception("Could not check scheduled topics; retrying")
@@ -228,25 +229,37 @@ async def start_research(request: Request):
     if "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
         form = await request.form()
         topic = form.get("topic", "")
+        details = form.get("details", "")
     else:
         try:
             body = await request.json()
-            topic = body.get("topic", "")
-        except Exception:
+        except ValueError:
             raise HTTPException(status_code=400, detail="無效的請求格式，請使用 JSON 或 form-urlencoded")
+        if not isinstance(body, dict):
+            raise HTTPException(status_code=400, detail="無效的請求格式，請使用 JSON 或 form-urlencoded")
+        topic = body.get("topic", "")
+        details = body.get("details", "")
 
-    if not topic:
+    if not isinstance(topic, str) or not topic.strip():
         raise HTTPException(status_code=400, detail="請提供研究主題")
+    if not isinstance(details, str):
+        raise HTTPException(status_code=400, detail="研究詳情必須是文字")
 
-    task_id = await enqueue_research(topic)
+    task_id = await enqueue_research(topic.strip(), details.strip())
     return {"task_id": task_id, "message": "任務已加入排隊隊列"}
 
 
 class ScheduledTopicRequest(BaseModel):
     topic: str = Field(min_length=1, max_length=500)
+    details: str | None = None
     start_date: datetime.date
     schedule_time: datetime.time
     interval_days: int = Field(ge=1, le=365)
+
+    @field_validator("details")
+    @classmethod
+    def validate_details(cls, value: str | None) -> str | None:
+        return value.strip() if value is not None else None
 
     @field_validator("topic")
     @classmethod
@@ -271,13 +284,15 @@ async def get_scheduled_topics():
 
 @app.post("/scheduled-topics", status_code=201)
 async def create_scheduled_topic(request: ScheduledTopicRequest):
-    return await save_scheduled_topic(request.topic, request.start_date, request.schedule_time, request.interval_days)
+    return await save_scheduled_topic(
+        request.topic, request.start_date, request.schedule_time, request.interval_days, details=request.details
+    )
 
 
 @app.put("/scheduled-topics/{job_id}")
 async def edit_scheduled_topic(job_id: str, request: ScheduledTopicRequest):
     job = await save_scheduled_topic(
-        request.topic, request.start_date, request.schedule_time, request.interval_days, job_id
+        request.topic, request.start_date, request.schedule_time, request.interval_days, job_id, request.details
     )
     if job is None:
         raise HTTPException(status_code=404, detail="Scheduled topic not found")

@@ -100,10 +100,12 @@ returns 401; an unavailable authentication service fails closed.
 POST /research
 Content-Type: application/json
 
-{ "topic": "Advances in fusion energy 2025" }
+{ "topic": "Advances in fusion energy 2025", "details": "Focus on recent reactor experiments and remaining challenges." }
 ```
 
-Returns a `task_id`. Also accepts `application/x-www-form-urlencoded`.
+`details` is optional and guides the research, writing, and editing stages. It is
+kept with the in-memory task, not saved with the completed report. Returns a
+`task_id`. Also accepts `application/x-www-form-urlencoded`.
 
 ### Poll task status
 
@@ -146,7 +148,7 @@ DELETE /reports/{report_id}
 
 ## Scheduled Reports
 
-Open **Scheduled Topics** in the web UI to add, edit, or delete recurring research topics. Each schedule has a starting date, a time, and an interval in days (1 for daily, 2 for every other day, 7 for weekly). Times are in the server's local time. If the starting date and time have passed, the first run is the next occurrence in that sequence.
+Open **Scheduled Topics** in the web UI to add, edit, or delete recurring research topics. Each schedule can include optional research details, which are saved with the schedule and used on every run. Each schedule has a starting date, a time, and an interval in days (1 for daily, 2 for every other day, 7 for weekly). Times are in the server's local time. If the starting date and time have passed, the first run is the next occurrence in that sequence.
 
 The server checks schedules every 10 seconds and queues due topics through the same single-worker queue as manual research. Schedules persist in SQLite and take effect without restarting the server. If the server was stopped at a scheduled time, it queues one catch-up run on startup and advances to the next future occurrence; it does not queue every missed run. Like manual tasks, queued runs are in memory and do not survive a server crash or restart. Run only one server worker to preserve the single research queue.
 

@@ -47,7 +47,7 @@ def _validate_chat_config() -> None:
         raise ValueError(f"Missing required LLM configuration: {', '.join(missing)}")
 
 
-def run_knowledge_extraction(task_id: str, topic: str, tasks_db: dict):
+def run_knowledge_extraction(task_id: str, topic: str, tasks_db: dict, details: str = ""):
     try:
         _validate_chat_config()
 
@@ -104,9 +104,10 @@ def run_knowledge_extraction(task_id: str, topic: str, tasks_db: dict):
         )
 
         # 定義任務流程
-        t1 = Task(description=f"深度搜尋 {topic} 並整理成事實清單。", expected_output="事實筆記", agent=researcher)
-        t2 = Task(description="根據筆記撰寫初稿。", expected_output="Markdown草稿", agent=writer)
-        t3 = Task(description="進行最終審核與語法修飾。", expected_output="最終版報告", agent=editor)
+        focus = f"\n研究需求與範圍：\n{details}" if details else ""
+        t1 = Task(description=f"深度搜尋 {topic} 並整理成事實清單。{focus}", expected_output="事實筆記", agent=researcher)
+        t2 = Task(description=f"根據筆記撰寫初稿。{focus}", expected_output="Markdown草稿", agent=writer)
+        t3 = Task(description=f"進行最終審核與語法修飾。{focus}", expected_output="最終版報告", agent=editor)
 
         # 執行 Crew
         tasks_db[task_id]["status"] = "writing"

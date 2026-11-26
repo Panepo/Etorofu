@@ -33,6 +33,7 @@ class ScheduledTopicModel(Base):
     __tablename__ = "scheduled_topics"
     id: Mapped[str] = mapped_column(String, primary_key=True)
     topic: Mapped[str] = mapped_column(String)
+    details: Mapped[str] = mapped_column(Text, default="", server_default="")
     start_date: Mapped[str] = mapped_column(String)
     schedule_time: Mapped[str] = mapped_column(String)
     interval_days: Mapped[int]
@@ -51,6 +52,7 @@ def scheduled_topic_dict(job: ScheduledTopicModel) -> dict:
     return {
         "id": job.id,
         "topic": job.topic,
+        "details": job.details,
         "start_date": job.start_date,
         "schedule_time": job.schedule_time,
         "interval_days": job.interval_days,
@@ -65,7 +67,8 @@ async def list_scheduled_topics() -> list[dict]:
 
 
 async def save_scheduled_topic(
-    topic: str, start_date: date, schedule_time: clock_time, interval_days: int, job_id: str | None = None
+    topic: str, start_date: date, schedule_time: clock_time, interval_days: int,
+    job_id: str | None = None, details: str | None = None,
 ) -> dict | None:
     async with async_session() as session:
         if job_id is None:
@@ -76,6 +79,8 @@ async def save_scheduled_topic(
             if job is None:
                 return None
         job.topic = topic
+        if details is not None:
+            job.details = details
         job.start_date = start_date.isoformat()
         job.schedule_time = schedule_time.strftime("%H:%M")
         job.interval_days = interval_days
@@ -107,12 +112,13 @@ async def claim_due_scheduled_topics(now: datetime) -> list[dict]:
                     ScheduledTopicModel.id == job.id,
                     ScheduledTopicModel.next_run == old_next_run,
                     ScheduledTopicModel.topic == job.topic,
+                    ScheduledTopicModel.details == job.details,
                     ScheduledTopicModel.interval_days == job.interval_days,
                 )
                 .values(next_run=next_run)
             )
             if updated.rowcount:
-                claimed.append({"id": job.id, "topic": job.topic})
+                claimed.append({"id": job.id, "topic": job.topic, "details": job.details})
         await session.commit()
         return claimed
 
@@ -120,7 +126,11 @@ async def claim_due_scheduled_topics(now: datetime) -> list[dict]:
 async def init_db():
     """建立所有資料表"""
     async with engine.begin() as conn:
+        await conn.exec_driver_sql("BEGIN IMMEDIATE")
         await conn.run_sync(Base.metadata.create_all)
+        columns = await conn.exec_driver_sql("PRAGMA table_info(scheduled_topics)")
+        if "details" not in {row[1] for row in columns}:
+            await conn.exec_driver_sql("ALTER TABLE scheduled_topics ADD COLUMN details TEXT NOT NULL DEFAULT ''")
 
 
 async def get_db():

@@ -158,6 +158,7 @@
     }
     input[type="text"]:focus, textarea:focus { border-color: #6366f1; }
     textarea { min-height: 260px; font-family: inherit; line-height: 1.6; }
+    #new-details { min-height: 100px; }
 
     .modal-footer {
       display: flex;
@@ -267,8 +268,10 @@
       <button class="modal-close" onclick="closeModal('add-overlay')">✕</button>
     </div>
     <div class="modal-body">
-      <label>Research Topic</label>
+      <label for="new-topic">Research Topic</label>
       <input type="text" id="new-topic" placeholder="e.g. Quantum computing breakthroughs 2025" />
+      <label for="new-details">Research Details (optional)</label>
+      <textarea id="new-details" placeholder="e.g. Focus on practical applications, recent developments, and challenges."></textarea>
       <div id="progress-msg"></div>
     </div>
     <div class="modal-footer">
@@ -387,6 +390,7 @@
     $(id).classList.remove('open');
     if (id === 'add-overlay') {
       $('new-topic').value = '';
+      $('new-details').value = '';
       $('progress-msg').innerHTML = '';
       $('submit-btn').disabled = false;
       $('submit-btn').innerHTML = 'Start Research';
@@ -505,6 +509,7 @@
 
   async function submitResearch() {
     const topic = $('new-topic').value.trim();
+    const details = $('new-details').value.trim();
     if (!topic) { $('new-topic').focus(); return; }
 
     $('submit-btn').disabled = true;
@@ -513,7 +518,7 @@
     const res = await fetch(api('research'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ topic })
+      body: JSON.stringify({ topic, details })
     });
     const data = await res.json();
     if (!res.ok) {

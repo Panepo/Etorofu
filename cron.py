@@ -29,7 +29,7 @@ async def main() -> None:
     for job in jobs:
         request = Request(
             args.url.rstrip("/") + "/research",
-            data=json.dumps({"topic": job["topic"]}).encode("utf-8"),
+            data=json.dumps({"topic": job["topic"], "details": job["details"]}).encode("utf-8"),
             headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"},
             method="POST",
         )

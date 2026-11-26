@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Scheduled Topics - Etorofu Research Hub</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; background: #0f1117; color: #e2e8f0; font-family: system-ui, -apple-system, sans-serif; }
+    header { background: #1a1d27; border-bottom: 1px solid #2d3148; padding: 1rem 2rem; }
+    h1 { font-size: 1.25rem; margin: 0; }
+    main { max-width: 960px; margin: 2rem auto; padding: 0 1.5rem; }
+    a { color: #a5b4fc; text-decoration: none; }
+    h2 { font-size: 1.1rem; margin: 1.5rem 0 .4rem; }
+    p { color: #94a3b8; font-size: .875rem; line-height: 1.5; }
+    .panel { background: #1a1d27; border: 1px solid #2d3148; border-radius: 10px; padding: 1.25rem; margin: 1.5rem 0; }
+    form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+    .wide { grid-column: 1 / -1; }
+    label { display: block; color: #94a3b8; font-size: .8rem; font-weight: 500; margin-bottom: .35rem; }
+    input { width: 100%; background: #0f1117; border: 1px solid #2d3148; border-radius: 6px; color: #e2e8f0; color-scheme: dark; font: inherit; padding: .55rem .8rem; }
+    input:focus { outline: 1px solid #6366f1; }
+    button { border: 0; border-radius: 6px; cursor: pointer; font-size: .875rem; font-weight: 500; padding: .55rem .9rem; }
+    button:disabled { opacity: .5; cursor: wait; }
+    .primary { background: #6366f1; color: white; }
+    .secondary { background: #334155; color: #e2e8f0; }
+    .danger { background: #7f1d1d; color: #fff; }
+    .actions { display: flex; gap: .5rem; flex-wrap: wrap; }
+    #message { min-height: 1.25rem; color: #f87171; margin: .5rem 0 0; }
+    .job { display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-top: 1px solid #2d3148; padding: 1rem 0; }
+    .job h3 { font-size: .95rem; margin: 0; overflow-wrap: anywhere; }
+    .job p { margin: .35rem 0 0; }
+    @media (max-width: 600px) {
+      form { grid-template-columns: 1fr; }
+      .wide { grid-column: auto; }
+      .job { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+<header><h1>Etorofu Research Hub</h1></header>
+<main>
+  <a href="./">&larr; Research Reports</a>
+  <h2>Scheduled Topics</h2>
+  <p>Each topic runs on its own schedule through the research queue. Dates and times use the server's local time.</p>
+  <section class="panel" aria-labelledby="form-title">
+    <h2 id="form-title">Add a schedule</h2>
+    <form id="schedule-form">
+      <div class="wide">
+        <label for="topic">Research topic</label>
+        <input id="topic" type="text" maxlength="500" required />
+      </div>
+      <div>
+        <label for="start-date">Starting date</label>
+        <input id="start-date" type="date" required />
+      </div>
+      <div>
+        <label for="schedule-time">Time</label>
+        <input id="schedule-time" type="time" value="08:00" required />
+      </div>
+      <div>
+        <label for="interval">Repeat every (days)</label>
+        <input id="interval" type="number" min="1" max="365" step="1" value="1" required />
+      </div>
+      <div class="wide actions">
+        <button id="save" class="primary" type="submit">Add schedule</button>
+        <button id="cancel" class="secondary" type="button" hidden>Cancel edit</button>
+      </div>
+    </form>
+    <p id="message" role="status" aria-live="polite"></p>
+  </section>
+  <section aria-labelledby="list-title">
+    <h2 id="list-title">Your schedules</h2>
+    <p>Use 1 day for daily, 2 days for every other day, or 7 days for weekly.</p>
+    <div id="jobs"></div>
+  </section>
+</main>
+<script>
+  const prefix = window.location.pathname.startsWith('/etorofu') ? '/etorofu' : '';
+  const api = path => `${prefix}/${path}`;
+  const $ = id => document.getElementById(id);
+  const originalFetch = window.fetch.bind(window);
+  window.fetch = async (...args) => {
+    const response = await originalFetch(...args);
+    if (response.status === 401) window.location.assign(api('login'));
+    return response;
+  };
+  let jobs = [];
+  let editingId = null;
+
+  function resetForm() {
+    editingId = null;
+    $('schedule-form').reset();
+    const now = new Date();
+    $('start-date').value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    $('form-title').textContent = 'Add a schedule';
+    $('save').textContent = 'Add schedule';
+    $('cancel').hidden = true;
+  }
+
+  async function request(path, options) {
+    const response = await fetch(api(path), options);
+    if (!response.ok) {
+      const body = await response.json();
+      throw new Error(typeof body.detail === 'string' ? body.detail : 'Please check the schedule fields.');
+    }
+    return response.json();
+  }
+
+  async function loadJobs() {
+    jobs = await request('scheduled-topics');
+    const list = $('jobs');
+    list.replaceChildren();
+    if (!jobs.length) {
+      const empty = document.createElement('p');
+      empty.textContent = 'No scheduled topics yet.';
+      list.append(empty);
+      return;
+    }
+    jobs.forEach(job => {
+      const row = document.createElement('div');
+      row.className = 'job';
+      const details = document.createElement('div');
+      const title = document.createElement('h3');
+      title.textContent = job.topic;
+      const description = document.createElement('p');
+      description.textContent = `Every ${job.interval_days} day${job.interval_days === 1 ? '' : 's'} at ${job.schedule_time} · Next: ${job.next_run.replace('T', ' ')}`;
+      details.append(title, description);
+      const actions = document.createElement('div');
+      actions.className = 'actions';
+      const edit = document.createElement('button');
+      edit.className = 'secondary';
+      edit.textContent = 'Edit';
+      edit.addEventListener('click', () => {
+        editingId = job.id;
+        $('topic').value = job.topic;
+        $('start-date').value = job.start_date;
+        $('schedule-time').value = job.schedule_time;
+        $('interval').value = job.interval_days;
+        $('form-title').textContent = 'Edit schedule';
+        $('save').textContent = 'Save changes';
+        $('cancel').hidden = false;
+        $('message').textContent = '';
+        $('topic').focus();
+      });
+      const remove = document.createElement('button');
+      remove.className = 'danger';
+      remove.textContent = 'Delete';
+      remove.addEventListener('click', async () => {
+        if (!confirm(`Delete the schedule for "${job.topic}"?`)) return;
+        try {
+          await request(`scheduled-topics/${job.id}`, { method: 'DELETE' });
+          if (editingId === job.id) resetForm();
+          await loadJobs();
+          $('message').textContent = '';
+        } catch (error) { $('message').textContent = error.message; }
+      });
+      actions.append(edit, remove);
+      row.append(details, actions);
+      list.append(row);
+    });
+  }
+
+  $('cancel').addEventListener('click', () => { resetForm(); $('message').textContent = ''; });
+  $('schedule-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    $('save').disabled = true;
+    $('message').textContent = '';
+    try {
+      await request(editingId ? `scheduled-topics/${editingId}` : 'scheduled-topics', {
+        method: editingId ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          topic: $('topic').value.trim(), start_date: $('start-date').value,
+          schedule_time: $('schedule-time').value, interval_days: Number($('interval').value)
+        })
+      });
+      resetForm();
+      await loadJobs();
+    } catch (error) { $('message').textContent = error.message; }
+    finally { $('save').disabled = false; }
+  });
+  resetForm();
+  loadJobs().catch(error => { $('message').textContent = error.message; });
+</script>
+</body>
+</html>

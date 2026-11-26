@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sign in - Etorofu Research Hub</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { background: #0f1117; color: #e2e8f0; font-family: system-ui, sans-serif; margin: 0; }
+    main { background: #1a1d27; border: 1px solid #2d3148; border-radius: 10px; margin: 10vh auto; max-width: 420px; padding: 1.5rem; width: 90%; }
+    h1 { font-size: 1.25rem; }
+    p, label { color: #94a3b8; font-size: .875rem; }
+    label { display: block; margin: 1rem 0 .4rem; }
+    input { background: #0f1117; border: 1px solid #2d3148; border-radius: 6px; color: #e2e8f0; font: inherit; padding: .6rem; width: 100%; }
+    button { background: #6366f1; border: 0; border-radius: 6px; color: white; cursor: pointer; font: inherit; margin-top: 1rem; padding: .6rem; width: 100%; }
+    button:disabled { opacity: .5; cursor: wait; }
+    #message { color: #f87171; min-height: 1.2em; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Etorofu Research Hub</h1>
+  <p>Sign in with your Shiratsuyu account.</p>
+  <form id="login-form">
+    <label for="email">Email</label>
+    <input id="email" type="email" autocomplete="username" required />
+    <label for="password">Password</label>
+    <input id="password" type="password" autocomplete="current-password" required />
+    <button id="submit" type="submit">Sign in</button>
+    <p id="message" role="status" aria-live="polite"></p>
+  </form>
+</main>
+<script>
+  document.getElementById('login-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    const button = document.getElementById('submit');
+    const password = document.getElementById('password');
+    const message = document.getElementById('message');
+    button.disabled = true;
+    message.textContent = '';
+    try {
+      const response = await fetch(new URL('auth/login', window.location.href), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: document.getElementById('email').value, password: password.value })
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        message.textContent = typeof result.detail === 'string' ? result.detail : 'Please check your email and password.';
+        return;
+      }
+      window.location.assign(new URL('./', window.location.href));
+    } catch (error) {
+      message.textContent = 'Could not reach the server. Please try again.';
+    } finally {
+      password.value = '';
+      button.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>

@@ -15,7 +15,9 @@ server.py       — FastAPI app, lifespan, background worker, API endpoints
 pyproject.toml  — Poe tasks, including the development server
 agent.py        — CrewAI agent definitions and run_knowledge_extraction()
 database.py     — SQLAlchemy models, init_db(), get_db(), and all CRUD functions
-.env            — CHAT_MODEL, CHAT_BASE_URL, CHAT_API_KEY
+cron.py         — Manually queue all configured scheduled topics through the server
+static/cron.html — Manage recurring topics, start dates, times, and day intervals
+.env            — CHAT_MODEL, CHAT_BASE_URL, CHAT_API_KEY, SHIRATSUYU_BASE_URL
 research_data.db — SQLite database file (git-ignored)
 requirements-dev.txt — Runtime and development dependencies
 ```
@@ -65,6 +67,10 @@ queued → searching → writing → tagging → completed
 ```
 Task state is tracked in `tasks_db` (in-memory dict) in `server.py`. On completion, the result and generated tags are persisted to SQLite via `database.save_report()`.
 
+The server checks SQLite-backed scheduled topics every 10 seconds and submits due
+jobs through the same queue. Schedules use the server's local time; after downtime,
+one overdue run is queued and the next run advances to a future occurrence.
+
 ### Database CRUD (`database.py`)
 
 **`ReportModel` schema**: `id`, `topic`, `content`, `tags` (comma-separated, nullable), `created_at`
@@ -84,4 +90,6 @@ Task state is tracked in `tasks_db` (in-memory dict) in `server.py`. On completi
 - **Never run multiple Crew instances concurrently.** The queue enforces this — do not change it.
 - **Schema changes to `ReportModel`** require either a migration or deleting `research_data.db` to recreate it.
 - `CHAT_MODEL`, `CHAT_BASE_URL`, and `CHAT_API_KEY` must be set in `.env` before submitting a research task.
+- `SHIRATSUYU_BASE_URL` must be set for login and token verification. Protected
+  requests use a Shiratsuyu JWT in the session cookie or Bearer header.
 

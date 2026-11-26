@@ -1,5 +1,7 @@
 import os
 import time
+import uuid
+from datetime import date, datetime, time as clock_time, timedelta
 from typing import Optional
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -25,6 +27,94 @@ class ReportModel(Base):
     content: Mapped[str] = mapped_column(Text)
     tags: Mapped[Optional[str]] = mapped_column(String, nullable=True, default=None)
     created_at: Mapped[float] = mapped_column(default=time.time)
+
+
+class ScheduledTopicModel(Base):
+    __tablename__ = "scheduled_topics"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    topic: Mapped[str] = mapped_column(String)
+    start_date: Mapped[str] = mapped_column(String)
+    schedule_time: Mapped[str] = mapped_column(String)
+    interval_days: Mapped[int]
+    next_run: Mapped[datetime]
+
+
+def next_scheduled_run(start: date, schedule: clock_time, interval_days: int, now: datetime) -> datetime:
+    first = datetime.combine(start, schedule)
+    if first > now:
+        return first
+    interval = timedelta(days=interval_days)
+    return first + interval * ((now - first) // interval + 1)
+
+
+def scheduled_topic_dict(job: ScheduledTopicModel) -> dict:
+    return {
+        "id": job.id,
+        "topic": job.topic,
+        "start_date": job.start_date,
+        "schedule_time": job.schedule_time,
+        "interval_days": job.interval_days,
+        "next_run": job.next_run.isoformat(timespec="minutes"),
+    }
+
+
+async def list_scheduled_topics() -> list[dict]:
+    async with async_session() as session:
+        result = await session.execute(select(ScheduledTopicModel).order_by(ScheduledTopicModel.next_run))
+        return [scheduled_topic_dict(job) for job in result.scalars()]
+
+
+async def save_scheduled_topic(
+    topic: str, start_date: date, schedule_time: clock_time, interval_days: int, job_id: str | None = None
+) -> dict | None:
+    async with async_session() as session:
+        if job_id is None:
+            job = ScheduledTopicModel(id=str(uuid.uuid4()))
+            session.add(job)
+        else:
+            job = await session.get(ScheduledTopicModel, job_id)
+            if job is None:
+                return None
+        job.topic = topic
+        job.start_date = start_date.isoformat()
+        job.schedule_time = schedule_time.strftime("%H:%M")
+        job.interval_days = interval_days
+        job.next_run = next_scheduled_run(start_date, schedule_time, interval_days, datetime.now())
+        await session.commit()
+        return scheduled_topic_dict(job)
+
+
+async def delete_scheduled_topic(job_id: str) -> bool:
+    async with async_session() as session:
+        result = await session.execute(delete(ScheduledTopicModel).where(ScheduledTopicModel.id == job_id))
+        await session.commit()
+        return result.rowcount > 0
+
+
+async def claim_due_scheduled_topics(now: datetime) -> list[dict]:
+    """Claim each due schedule once and advance to its next future occurrence."""
+    async with async_session() as session:
+        result = await session.execute(select(ScheduledTopicModel).where(ScheduledTopicModel.next_run <= now))
+        claimed = []
+        for job in result.scalars():
+            old_next_run = job.next_run
+            next_run = next_scheduled_run(
+                old_next_run.date(), old_next_run.time(), job.interval_days, now
+            )
+            updated = await session.execute(
+                update(ScheduledTopicModel)
+                .where(
+                    ScheduledTopicModel.id == job.id,
+                    ScheduledTopicModel.next_run == old_next_run,
+                    ScheduledTopicModel.topic == job.topic,
+                    ScheduledTopicModel.interval_days == job.interval_days,
+                )
+                .values(next_run=next_run)
+            )
+            if updated.rowcount:
+                claimed.append({"id": job.id, "topic": job.topic})
+        await session.commit()
+        return claimed
 
 
 async def init_db():

@@ -2,6 +2,36 @@
 
 Base URL: `http://localhost:8050`
 
+## Authentication
+
+Sign in at `/login` or send `POST /auth/login` with JSON `email` and `password`.
+The server validates the Shiratsuyu JWT and sets an HttpOnly session cookie.
+`POST /auth/logout` clears the cookie. All other pages and endpoints require
+that cookie or an `Authorization: Bearer <shiratsuyu_jwt>` header. Expired or
+invalid sessions return 401; authentication service failures fail closed.
+
+---
+
+## Scheduled topics
+
+`GET /scheduled-topics` lists schedules. `POST /scheduled-topics` creates one;
+`PUT /scheduled-topics/{id}` replaces it; and `DELETE /scheduled-topics/{id}`
+removes it. Create and replace accept:
+
+```json
+{
+  "topic": "AI research",
+  "start_date": "2026-11-26",
+  "schedule_time": "23:00",
+  "interval_days": 2
+}
+```
+
+The interval is 1–365 calendar days. Dates and times use the server's local
+time. Responses include the schedule's `id` and `next_run` (local ISO datetime).
+Invalid inputs return 422 and unknown IDs return 404. The first run is the
+next occurrence after saving; overdue schedules are queued once on restart.
+
 ---
 
 ## POST `/research`

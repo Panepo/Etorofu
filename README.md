@@ -34,12 +34,13 @@ server.py           — FastAPI app, lifespan, background worker, all API endpoi
 pyproject.toml      — Poe tasks, including the development server
 agent.py            — CrewAI agents and run_knowledge_extraction()
 database.py         — SQLAlchemy models and all CRUD functions
-cron.py             — Standalone script for scheduled report generation
+cron.py             — Queue all scheduled topics once via the running server
 install_dependency.py — Dependency installer helper
 requirements.txt    — Python dependencies
 requirements-dev.txt — Development dependencies
 Dockerfile          — Multi-stage Docker build
 static/index.html   — Single-page web UI (list, add, edit, delete reports)
+static/cron.html    — Manage recurring research topics
 research_data.db    — SQLite database (created on first run, git-ignored)
 ```
 
@@ -65,11 +66,17 @@ CHAT_MODEL=your-model-name
 CHAT_BASE_URL=http://localhost:8000/v1
 CHAT_API_KEY=your-api-key
 DATABASE_URL=sqlite+aiosqlite:///./research_data.db
-
-# Optional — enable the built-in daily cron daemon
-CRON_TOPIC=Latest developments in quantum computing
-CRON_SCHEDULE=08:00
+SHIRATSUYU_BASE_URL=https://your-shiratsuyu-api
 ```
+
+`SHIRATSUYU_BASE_URL` is the API base URL before `/auth`. Users sign in with
+their Shiratsuyu email and password; their JWT is kept in an HttpOnly,
+SameSite=Strict session cookie and verified with Shiratsuyu on every protected
+request. Logging out removes the browser cookie; the JWT remains valid until
+Shiratsuyu expires or revokes it. Expose both Etorofu and Shiratsuyu over HTTPS
+to protect credentials and tokens in transit. When behind a TLS-terminating
+proxy, configure Uvicorn to trust forwarded headers only from that proxy so
+the session cookie is marked Secure.
 
 ### Start the server
 
@@ -81,6 +88,11 @@ The web UI is available at `http://localhost:8050/`.
 Interactive API docs are available at `http://localhost:8050/docs`.
 
 ## API Reference
+
+All site pages and API endpoints except `/login`, `POST /auth/login`, and
+`POST /auth/logout` require a valid Shiratsuyu session. API clients can instead
+send `Authorization: Bearer <shiratsuyu_jwt>`. A failed or expired session
+returns 401; an unavailable authentication service fails closed.
 
 ### Submit a research task
 
@@ -132,19 +144,22 @@ At least one field (`content` or `tags`) must be provided.
 DELETE /reports/{report_id}
 ```
 
-## Scheduled Reports (Cron)
+## Scheduled Reports
 
-Two modes are available:
+Open **Scheduled Topics** in the web UI to add, edit, or delete recurring research topics. Each schedule has a starting date, a time, and an interval in days (1 for daily, 2 for every other day, 7 for weekly). Times are in the server's local time. If the starting date and time have passed, the first run is the next occurrence in that sequence.
 
-**Built-in daemon** — set `CRON_TOPIC` and `CRON_SCHEDULE` in `.env`. The server automatically queues one report per day at the configured time.
+The server checks schedules every 10 seconds and queues due topics through the same single-worker queue as manual research. Schedules persist in SQLite and take effect without restarting the server. If the server was stopped at a scheduled time, it queues one catch-up run on startup and advances to the next future occurrence; it does not queue every missed run. Like manual tasks, queued runs are in memory and do not survive a server crash or restart. Run only one server worker to preserve the single research queue.
 
-**External scheduler** — run `cron.py` directly via Windows Task Scheduler or crontab:
+The old `CRON_TOPIC` and `CRON_SCHEDULE` environment variables are no longer used. Add the desired topics in the web UI instead. To manually queue every configured topic once, run this while the server is running:
 
 ```bash
 python cron.py
 ```
 
-This reads `CRON_TOPIC` from `.env`, generates one report, saves it to the database, and exits.
+This submits jobs to the server and exits without waiting for reports. Set
+`SHIRATSUYU_TOKEN` to a valid Shiratsuyu JWT for this manual command. The
+server's built-in scheduler does not need a token. `python cron.py --daemon`
+is no longer needed: scheduling runs in the server.
 
 ## Docker
 

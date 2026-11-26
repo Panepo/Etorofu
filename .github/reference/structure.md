@@ -1,10 +1,10 @@
 ## Project Overview
-An automated web research system running on an Asus GX10. It uses **FastAPI** as the backend, **CrewAI** as the multi-agent framework, and **Ollama** to run local **Qwen 3.5** models. The system features an async task queue and SQLite persistent storage.
+An automated web research system running on an Asus GX10. It uses **FastAPI** as the backend, **CrewAI** as the multi-agent framework, and an **OpenAI-compatible LLM server** configured through `.env`. The system features an async task queue and SQLite persistent storage.
 
 ## Tech Stack
 - **Framework**: FastAPI (async)
 - **Agent Framework**: CrewAI
-- **LLM Engine**: Ollama — `qwen3.5:9b` for research, `qwen3.5:35b` for writing/editing
+- **LLM Engine**: OpenAI-compatible server — `CHAT_MODEL`, `CHAT_BASE_URL`, and `CHAT_API_KEY` are configured in `.env`
 - **Database**: SQLite via SQLAlchemy (async) + aiosqlite
 - **Search Tool**: DuckDuckGo (`langchain_community.tools.DuckDuckGoSearchRun`)
 - **Config**: `.env` loaded via `python-dotenv`
@@ -12,15 +12,17 @@ An automated web research system running on an Asus GX10. It uses **FastAPI** as
 ## File Structure
 ```
 server.py       — FastAPI app, lifespan, background worker, API endpoints
+pyproject.toml  — Poe tasks, including the development server
 agent.py        — CrewAI agent definitions and run_knowledge_extraction()
 database.py     — SQLAlchemy models, init_db(), get_db(), and all CRUD functions
-.env            — OLLAMA_URL, MODEL_FAST, MODEL_SMART
+.env            — CHAT_MODEL, CHAT_BASE_URL, CHAT_API_KEY
 research_data.db — SQLite database file (git-ignored)
+requirements-dev.txt — Runtime and development dependencies
 ```
 
 ## Essential Commands
-- **Start server**: `python server.py` or `uvicorn server:app --reload`
-- **Install dependencies**: `pip install fastapi uvicorn crewai langchain_ollama langchain_community sqlalchemy aiosqlite duckduckgo-search python-dotenv`
+- **Start dev server**: `poe dev`
+- **Install dependencies**: `pip install -r requirements-dev.txt`
 - **API docs**: `http://localhost:8050/docs` after server start
 
 ## Code Conventions
@@ -46,10 +48,10 @@ research_data.db — SQLite database file (git-ignored)
 ### Model Assignment
 | Agent | Model env var | Purpose |
 |---|---|---|
-| Researcher | `MODEL_FAST` (`qwen3.5:9b`) | Web search — fast iteration |
-| Writer | `MODEL_SMART` (`qwen3.5:35b`) | Draft generation — quality output |
-| Editor | `MODEL_SMART` (`qwen3.5:35b`) | Proofreading — precision |
-| Tag generator | `MODEL_FAST` (`qwen3.5:9b`) | Keyword extraction — via `generate_tags()` in `agent.py` |
+| Researcher | `CHAT_MODEL` | Web search — fast iteration |
+| Writer | `CHAT_MODEL` | Draft generation — quality output |
+| Editor | `CHAT_MODEL` | Proofreading — precision |
+| Tag generator | `CHAT_MODEL` | Keyword extraction — via `generate_tags()` in `agent.py` |
 
 ## Architecture Notes
 
@@ -81,5 +83,5 @@ Task state is tracked in `tasks_db` (in-memory dict) in `server.py`. On completi
 ## Important Warnings
 - **Never run multiple Crew instances concurrently.** The queue enforces this — do not change it.
 - **Schema changes to `ReportModel`** require either a migration or deleting `research_data.db` to recreate it.
-- `MODEL_FAST` and `MODEL_SMART` must be set in `.env` before starting the server. The app will not raise a clear error if they are missing — the Ollama call will simply fail at runtime.
+- `CHAT_MODEL`, `CHAT_BASE_URL`, and `CHAT_API_KEY` must be set in `.env` before submitting a research task.
 

@@ -35,11 +35,8 @@ COPY static/ ./static/
 # Persistent volume for the SQLite database
 VOLUME ["/data"]
 
-# Environment variables (override at runtime via --env or .env file)
-ENV OLLAMA_URL=http://host.docker.internal:8088 \
-    MODEL_FAST=qwen3.5:9b \
-    MODEL_SMART=qwen3.5:35b \
-    DATABASE_URL=sqlite+aiosqlite:////data/research_data.db
+# Database location (LLM settings are supplied at runtime via --env or .env file)
+ENV DATABASE_URL=sqlite+aiosqlite:////data/research_data.db
 
 EXPOSE 8050
 

@@ -1,0 +1,2 @@
+-r requirements.txt
+poethepoet>=0.37

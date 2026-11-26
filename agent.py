@@ -4,17 +4,14 @@ from crewai import Agent, Task, Crew, Process, LLM
 from crewai.tools import tool
 from langchain_community.tools import DuckDuckGoSearchRun
 from langchain_core.messages import HumanMessage
-from langchain_ollama import ChatOllama
+from langchain_openai import ChatOpenAI
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# --- Ollama 配置 ---
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:8088")
-
-# --- 模型混合配置 ---
-MODEL_FAST = os.getenv("OLLAMA_MODEL_FAST")    # 快速，適合反覆搜尋
-MODEL_SMART = os.getenv("OLLAMA_MODEL_SMART")   # 強大，適合內容創作與校對
+CHAT_MODEL = os.getenv("CHAT_MODEL")
+CHAT_BASE_URL = os.getenv("CHAT_BASE_URL")
+CHAT_API_KEY = os.getenv("CHAT_API_KEY")
 
 
 @tool("DuckDuckGo Search")
@@ -36,14 +33,47 @@ def generate_tags(content: str, llm) -> str:
     return response.content.strip().strip('"').strip("'")
 
 
+def _validate_chat_config() -> None:
+    missing = [
+        name
+        for name, value in (
+            ("CHAT_MODEL", CHAT_MODEL),
+            ("CHAT_BASE_URL", CHAT_BASE_URL),
+            ("CHAT_API_KEY", CHAT_API_KEY),
+        )
+        if not value
+    ]
+    if missing:
+        raise ValueError(f"Missing required LLM configuration: {', '.join(missing)}")
+
+
 def run_knowledge_extraction(task_id: str, topic: str, tasks_db: dict):
     try:
-        # ChatOllama instances for direct LangChain calls (e.g. generate_tags)
-        fast_chat = ChatOllama(base_url=OLLAMA_URL, model=MODEL_FAST, temperature=0.5)
+        _validate_chat_config()
+
+        # LangChain client for direct calls such as generate_tags.
+        fast_chat = ChatOpenAI(
+            base_url=CHAT_BASE_URL,
+            api_key=CHAT_API_KEY,
+            model=CHAT_MODEL,
+            temperature=0.5,
+        )
 
         # CrewAI LLM instances for agents
-        fast_llm = LLM(model=f"ollama/{MODEL_FAST}", base_url=OLLAMA_URL, temperature=0.5)
-        smart_llm = LLM(model=f"ollama/{MODEL_SMART}", base_url=OLLAMA_URL, temperature=0.7)
+        fast_llm = LLM(
+            model=CHAT_MODEL,
+            provider="openai",
+            base_url=CHAT_BASE_URL,
+            api_key=CHAT_API_KEY,
+            temperature=0.5,
+        )
+        smart_llm = LLM(
+            model=CHAT_MODEL,
+            provider="openai",
+            base_url=CHAT_BASE_URL,
+            api_key=CHAT_API_KEY,
+            temperature=0.7,
+        )
 
         # 1. 研究員 (使用快速模型)
         tasks_db[task_id]["status"] = "searching"

@@ -1,6 +1,6 @@
 # Etorofu Research Hub
 
-An automated web research system that uses a multi-agent pipeline to search the web, write, and edit structured reports — all running locally with no external AI APIs.
+An automated web research system that uses a multi-agent pipeline to search the web, write, and edit structured reports through an OpenAI-compatible LLM server.
 
 ## How It Works
 
@@ -21,9 +21,8 @@ All reports are written in **Traditional Chinese (繁體中文)**.
 |---|---|
 | API server | FastAPI (async) + Uvicorn |
 | Agent framework | CrewAI |
-| LLM engine | Ollama (local) |
-| Research model | `qwen3.5:9b` |
-| Writing / editing model | `qwen3.5:35b` |
+| LLM engine | OpenAI-compatible server (configured via `.env`) |
+| Model | `CHAT_MODEL` |
 | Search | DuckDuckGo (`langchain_community`) |
 | Database | SQLite via SQLAlchemy async + aiosqlite |
 | Config | `.env` via python-dotenv |
@@ -32,11 +31,13 @@ All reports are written in **Traditional Chinese (繁體中文)**.
 
 ```
 server.py           — FastAPI app, lifespan, background worker, all API endpoints
+pyproject.toml      — Poe tasks, including the development server
 agent.py            — CrewAI agents and run_knowledge_extraction()
 database.py         — SQLAlchemy models and all CRUD functions
 cron.py             — Standalone script for scheduled report generation
 install_dependency.py — Dependency installer helper
 requirements.txt    — Python dependencies
+requirements-dev.txt — Development dependencies
 Dockerfile          — Multi-stage Docker build
 static/index.html   — Single-page web UI (list, add, edit, delete reports)
 research_data.db    — SQLite database (created on first run, git-ignored)
@@ -47,12 +48,12 @@ research_data.db    — SQLite database (created on first run, git-ignored)
 ### Prerequisites
 
 - Python 3.12+
-- [Ollama](https://ollama.com/) running with `qwen3.5:9b` and `qwen3.5:35b` pulled
+- An OpenAI-compatible chat-completions server accessible at `CHAT_BASE_URL`
 
 ### Install
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 ```
 
 ### Configure
@@ -60,9 +61,9 @@ pip install -r requirements.txt
 Create a `.env` file in the project root:
 
 ```env
-OLLAMA_URL=http://localhost:8088
-OLLAMA_MODEL_FAST=qwen3.5:9b
-OLLAMA_MODEL_SMART=qwen3.5:35b
+CHAT_MODEL=your-model-name
+CHAT_BASE_URL=http://localhost:8000/v1
+CHAT_API_KEY=your-api-key
 DATABASE_URL=sqlite+aiosqlite:///./research_data.db
 
 # Optional — enable the built-in daily cron daemon
@@ -73,7 +74,7 @@ CRON_SCHEDULE=08:00
 ### Start the server
 
 ```bash
-uvicorn server:app --host 0.0.0.0 --port 8050
+poe dev
 ```
 
 The web UI is available at `http://localhost:8050/`.
@@ -160,7 +161,7 @@ docker run -d \
   etorofu
 ```
 
-The default `OLLAMA_URL` inside the container points to `http://host.docker.internal:8088`. Override this in `.env` if your Ollama host differs.
+Set `CHAT_MODEL`, `CHAT_BASE_URL`, and `CHAT_API_KEY` in `.env`; they are passed to the container by `--env-file .env`.
 
 ## Architecture Notes
 
